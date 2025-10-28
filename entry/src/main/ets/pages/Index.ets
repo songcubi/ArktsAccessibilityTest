@@ -8,8 +8,6 @@ import { EnvironmentCallback } from '@kit.AbilityKit';
 struct Index {
   private uiContext: UIContext = this.getUIContext();
   private promptAction: PromptAction = this.uiContext.getPromptAction();
-  private screenDensityCallBack: Callback<number> | null = null;
-  private environmentCallback: EnvironmentCallback | null = null;
   @State fontWeightScale: string = 'none';
   @State fontScale: string = 'none';
   @State darkMode: string = 'none';
@@ -28,26 +26,27 @@ struct Index {
   }
 
   /**
-   * 监听显示大小缩放scaledDensity
+   * 监听显示大小缩放修改scaledDensity
    */
   registerScreenDensityChange() {
-    this.screenDensityCallBack = (data: number) => {
+    const screenDensityCallBack = (data: number) => {
       try {
         this.screenDensityConfUpdate = JSON.stringify(display.getDefaultDisplaySync().scaledDensity);
       } catch (error) {
         hilog.error(0x0000, 'ohos.arkui.ui.Index', 'registerScreenDensityChange error');
       }
     }
-    display.on('change', this.screenDensityCallBack);
+    display.on('change', screenDensityCallBack);
   }
 
   /**
+   * 监听字体大小修改fontSizeScale
    * 监听字体粗细修改fontWeightScale
    * 监听主题显示模式colorMode
    */
   registerAppContextEnvironmentChange() {
-    let that=this;
-    this.environmentCallback = {
+    let that = this;
+    const environmentCallback: EnvironmentCallback = {
       onConfigurationUpdated(config) {
         that.fontScaleConfUpdate = JSON.stringify(config.fontSizeScale);
         that.fontWeightScaleConfUpdate = JSON.stringify(config.fontWeightScale);
@@ -59,7 +58,7 @@ struct Index {
     }
     const appContext = this.getUIContext().getHostContext()?.getApplicationContext();
     try {
-      appContext?.on('environment', this.environmentCallback)
+      appContext?.on('environment', environmentCallback)
     } catch (paramError) {
       hilog.error(0x0000, 'ohos.arkui.ui.Index', 'registerAppContextEnvironmentChange error');
     }
