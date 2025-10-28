@@ -1,13 +1,15 @@
 import font from '@ohos.font';
-import { display, uiAppearance, window } from '@kit.ArkUI';
+import { display, PromptAction, uiAppearance, window } from '@kit.ArkUI';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { EnvironmentCallback } from '@kit.AbilityKit';
-
-let callbackId: number;
 
 @Entry
 @Component
 struct Index {
+  private uiContext: UIContext = this.getUIContext();
+  private promptAction: PromptAction = this.uiContext.getPromptAction();
+  private screenDensityCallBack: Callback<number> | null = null;
+  private environmentCallback: EnvironmentCallback | null = null;
   @State fontWeightScale: string = 'none';
   @State fontScale: string = 'none';
   @State darkMode: string = 'none';
@@ -15,45 +17,52 @@ struct Index {
   @State fontWeightScaleConfUpdate: string = 'ConfUpdate';
   @State fontScaleConfUpdate: string = 'ConfUpdate';
   @State darkModeConfUpdate: string = 'ConfUpdate';
-  @State scaledDensityConfUpdate: string = 'ConfUpdate';
+  @State screenDensityConfUpdate: string = 'ConfUpdate';
 
   aboutToAppear() {
-
-
-    const uiContext = this.getUIContext();
-    const hostContext = uiContext.getHostContext();
-    const appContext = hostContext?.getApplicationContext();
-    try {
-      callbackId = appContext?.on('environment', this.environmentCallback()) || 0;
-    } catch (paramError) {
-    }
-
+    this.registerAppContextEnvironmentChange();
+    this.registerScreenDensityChange();
   }
 
   aboutToDisappear() {
-    const uiContext = this.getUIContext();
-    const hostContext = uiContext.getHostContext();
-    const appContext = hostContext?.getApplicationContext();
-    if (callbackId !== 0) {
-      appContext?.off('environment', callbackId);
-    }
   }
 
-  environmentCallback(): EnvironmentCallback {
-    const that = this;
-    return {
-      onConfigurationUpdated(config) {
-        that.darkModeConfUpdate = JSON.stringify(config.colorMode);
-        that.fontWeightScaleConfUpdate= JSON.stringify(config.fontWeightScale);
-        that.fontScaleConfUpdate= JSON.stringify(config.fontSizeScale);
-        that.scaledDensityConfUpdate=config.screenDensity? JSON.stringify(config.screenDensity/160): 'none';
+  /**
+   * 监听显示大小缩放scaledDensity
+   */
+  registerScreenDensityChange() {
+    this.screenDensityCallBack = (data: number) => {
+      try {
+        this.screenDensityConfUpdate = JSON.stringify(display.getDefaultDisplaySync().scaledDensity);
+      } catch (error) {
+        hilog.error(0x0000, 'ohos.arkui.ui.Index', 'registerScreenDensityChange error');
+      }
+    }
+    display.on('change', this.screenDensityCallBack);
+  }
 
-        console.info(`onConfigurationUpdated config: ${JSON.stringify(config)}`);
+  /**
+   * 监听字体粗细修改fontWeightScale
+   * 监听主题显示模式colorMode
+   */
+  registerAppContextEnvironmentChange() {
+    let that=this;
+    this.environmentCallback = {
+      onConfigurationUpdated(config) {
+        that.fontScaleConfUpdate = JSON.stringify(config.fontSizeScale);
+        that.fontWeightScaleConfUpdate = JSON.stringify(config.fontWeightScale);
+        that.darkModeConfUpdate = JSON.stringify(config.colorMode);
       },
       onMemoryLevel(level) {
-        console.info(`onMemoryLevel level: ${level}`);
+        console.log('onMemoryLevel')
       }
-    };
+    }
+    const appContext = this.getUIContext().getHostContext()?.getApplicationContext();
+    try {
+      appContext?.on('environment', this.environmentCallback)
+    } catch (paramError) {
+      hilog.error(0x0000, 'ohos.arkui.ui.Index', 'registerAppContextEnvironmentChange error');
+    }
   }
 
   build() {
@@ -64,53 +73,57 @@ struct Index {
         .margin(50)
         .onClick(() => {
           try {
-            this.fontWeightScale = JSON.stringify(uiAppearance.getFontWeightScale());
             this.fontScale = JSON.stringify(uiAppearance.getFontScale());
+            this.fontWeightScale = JSON.stringify(uiAppearance.getFontWeightScale());
+            this.scaledDensity = JSON.stringify(display.getDefaultDisplaySync().scaledDensity);
             this.darkMode = JSON.stringify(uiAppearance.getDarkMode());
-            let displayObj = display.getDefaultDisplaySync();
-            this.scaledDensity = JSON.stringify(displayObj.scaledDensity);
-
 
           } catch (error) {
             console.log(error);
           }
         })
 
-      Text(`fontWeightScale=${this.fontWeightScale}`)
-      Text(`fontScale=${this.fontScale}`)
+      Text(`字体大小=${this.fontScale}`)
+      Text(`字体粗细=${this.fontWeightScale}`)
+      Text(`显示大小缩放=${this.scaledDensity}`)
       Text(`darkMode=${this.darkMode}`)
-      Text(`scaledDensity=${this.scaledDensity}`)
 
       Blank().height(20)
 
-      Text(`fontWeightScaleConfUpdate=${this.fontWeightScaleConfUpdate}`)
-      Text(`fontScaleConfUpdate=${this.fontScaleConfUpdate}`)
+      Text(`字体大小=${this.fontScaleConfUpdate}`)
+      Text(`字体粗细=${this.fontWeightScaleConfUpdate}`)
+      Text(`显示大小缩放=${this.screenDensityConfUpdate}`)
       Text(`darkModeConfUpdate=${this.darkModeConfUpdate}`)
-      Text(`scaledDensityConfUpdate=${this.scaledDensityConfUpdate}`)
-        .accessibilityText("需要获取系统设置以显示字体配置信息")
 
 
-      Blank().height(20)
-      Text("屏幕朗读")
-      Button("")
-        .width(30)
-        .height(30)
-        .margin(50)
-        .backgroundColor(Color.Green)
-
-      Button("读取身份")
-        .width(80)
-        .height(30)
-        .margin(50)
-        .backgroundColor(Color.Blue)
-
-      Button("")
-        .width(30)
-        .height(30)
-        .margin(50)
-        .backgroundColor(Color.Red)
-        .accessibilityText("自定义的无障碍文本")
-
+      // Blank().height(20)
+      // Button("")
+      //   .width(30)
+      //   .height(30)
+      //   .margin(50)
+      //   .backgroundColor(Color.Green)
+      //   .onClick(() => {
+      //     try {
+      //       this.promptAction.showToast({
+      //         message: 'aboutToDisappear',
+      //         duration: 2000
+      //       })
+      //     } catch (error) {
+      //     }
+      //   })
+      //
+      // Button("读取身份")
+      //   .width(80)
+      //   .height(30)
+      //   .margin(50)
+      //   .backgroundColor(Color.Blue)
+      //
+      // Button("")
+      //   .width(30)
+      //   .height(30)
+      //   .margin(50)
+      //   .backgroundColor(Color.Red)
+      //   .accessibilityText("自定义的无障碍文本")
 
     }.width('100%')
   }
